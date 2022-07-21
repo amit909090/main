@@ -1,0 +1,47 @@
+---
+- hosts: server
+  become: true
+  tasks:
+  - name: download Blackbox exporter
+    get_url:
+        url: https://github.com/prometheus/blackbox_exporter/releases/download/v0.21.0/blackbox_exporter-0.21.0.linux-amd64.tar.gz
+        dest: /tmp
+  - name: unpack the tar file
+    command: chdir=/tmp tar -xf blackbox_exporter-0.21.0.linux-amd64.tar.gz
+  - name: Create group 'blackbox_exporter' to run the blackbox exporter service
+    group: blackbox_exporter
+    name: blackbox_exporter
+    state: present
+  - name: Create user 'blackbox_exporter' to run the blackbox exporter service
+    user:
+      name: blackbox_exporter
+      group: blackbox_exporter
+      state: present
+  - name: move blackbox_exporter to /usr/local/bin
+    command: chdir=/tmp/blackbox_exporter-0.21.0.linux-amd64 mv blackbox_exporter /usr/local/bin
+  - name: Create a directory if it does not exist
+    file:
+    path: /etc/blackbox_exporter
+    state: directory
+    mode: '0755'
+  - name: move blackbox.yml file to /etc/blackbox_exporter
+    command: chdir=/tmp/blackbox_exporter-0.21.0.linux-amd64 mv blackbox.yml /etc/blackbox_exporter/ 
+  - name: change file ownership and permission
+    command: chdir=/etc/blackbox_exporter/
+    file:
+      path: /etc/blackbox_exporter
+      owner: blackbox_exporter
+      group: blackbox_exporter 
+      mode: 0644
+  - name: copy node_exporter.service file
+    copy:
+     src: /etc/ansible/files/node_exporter.service
+     dest: /etc/systemd/system/
+  - name: Change the permission of service file
+    file: 
+     path: /etc/systemd/system/node_exporter.service
+     mode: '0755'
+  - name: reload the systemctl daemon
+    command: systemctl daemon-reload
+  - name: start the blackbox exporter service
+    command: systemctl enable blackbox_exporter.service
